@@ -10,6 +10,7 @@ local DynO = require 'DynO'
 local czor = world:create_object('Compositor')
 
 local balls = 3
+local ball_up_speed = 400
 
 function background()
    czor:clear_with_color(util.rgba(255,255,255,255))
@@ -92,6 +93,22 @@ function Paddle:update()
    self:go():pos(pos)
 end
 
+function Paddle:colliding_with(obj)
+   if obj:is_a(Ball) then
+      -- distance from center of paddle
+      local other = obj:go()
+      local dp = vector.new(other:pos()) - self:go():pos()
+      local dv = vector.new({0, ball_up_speed}) - other:vel()
+
+      -- add an x impulse for our offset from paddle center and a y
+      -- impulse to maintain a constant vertical component
+      local impx = dp[1] * other:mass() * 10
+      local impy = dv[2] * other:mass()
+
+      other:apply_impulse({impx, impy})
+   end
+end
+
 function gameboard()
    -- walls
    local bottomd = {offset={screen_width/2, 0},
@@ -126,28 +143,30 @@ function gameboard()
 end
 
 function bricks()
-   local bw = 32
-   local bh = 16
+   local bw = 96
+   local bh = 32
    local bs = 8
    local dim = {bw, bh}
 
    local margin = 32
    local rswidth = screen_width - 2*margin
 
-   local cw = math.floor(rswidth / (bw + bs))
+   local fbw = bw + bs
+   local fbh = bh + bs
+   local cw = math.floor(rswidth / fbw)
    local ch = 4
-   local bswidth = cw * (bw + bs)
-   local bsheight = ch * (bh + bs)
+   local bswidth = cw * fbw
+   local bsheight = ch * fbh
 
-   local ox = margin/2 + (rswidth - bswidth) / 2
-   local oy = screen_height - bsheight - bh
+   local ox = (screen_width - bswidth) / 2 - bw/2
+   local oy = screen_height - bsheight - bh/2 - margin
 
    local bricks = {}
 
    for ii=1,ch do
       for jj=1,cw do
-         local x = ox + (bw + bs) * jj
-         local y = oy + (bh + bs) * ii
+         local x = ox + fbw * jj
+         local y = oy + fbh * ii
          local pos = vector.new({x, y})
          table.insert(bricks, Brick(pos, dim))
       end
@@ -168,7 +187,7 @@ function level_init()
    Paddle()
 
    local all_bricks = bricks()
-   local ball = Ball({screen_width/2, 32}, {100, 300})
+   local ball = Ball({screen_width/2, 64}, {100, ball_up_speed})
    local thread = function()
       if balls < 0 then
          for ii, brick in ipairs(all_bricks) do
